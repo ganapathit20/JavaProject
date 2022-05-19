@@ -1,0 +1,124 @@
+package io.boodskap.iot.spi.storage.cassandra.dao;
+
+import java.util.Arrays;
+import java.util.Collection;
+
+import io.boodskap.iot.StorageException;
+import io.boodskap.iot.dao.DeviceFileDAO;
+import io.boodskap.iot.model.IFileContent;
+import io.boodskap.iot.model.pojo.DeviceFile;
+import io.boodskap.iot.model.pojo.FileContent;
+import io.boodskap.iot.spi.storage.cassandra.Cassandra;
+
+public class DeviceFileDAOImpl extends BaseDomainDAO<DeviceFile> implements DeviceFileDAO<DeviceFile> {
+
+	private static final DeviceFileDAOImpl instance = new DeviceFileDAOImpl();
+
+	private DeviceFileDAOImpl() {
+		super(DeviceFile.class);
+	}
+
+	public static DeviceFileDAOImpl get() {
+		return instance;
+	}
+
+	@Override
+	public Class<? extends IFileContent> contentClazz() {
+		return FileContent.class;
+	}
+
+	@Override
+	public DeviceFile create(String domainKey, String deviceId, String fileId) {
+		return new DeviceFile(domainKey, deviceId, fileId);
+	}
+
+	@Override
+	public DeviceFile get(String domainKey, String deviceId, String fileId, boolean load) throws StorageException {
+		return Cassandra.get().get(clazz, false, Cassandra.argsToMap(new String[][]{{"domainKey",domainKey},{"deviceId",deviceId},{"fileId",fileId}}), null);
+	}
+
+	@Override
+	public IFileContent getContent(String domainKey, String deviceId, String fileId) throws StorageException {
+		
+		final DeviceFile e = get(domainKey, deviceId, fileId, true);
+
+		if (null!=e) {
+			return new IFileContent() {
+
+				private static final long serialVersionUID = -6848970044178089433L;
+
+				@Override
+				public void setMediaType(String mediaType) {}
+
+				@Override
+				public void setData(byte[] data) {}
+
+				@Override
+				public String getMediaType() {
+					return e.getMediaType();
+				}
+
+				@Override
+				public byte[] getData() {
+					return e.getData();
+				}
+			};
+		}
+		return null;
+	}
+
+	@Override
+	public boolean has(String domainKey, String deviceId, String fileId) throws StorageException {
+		return null!=get(domainKey, deviceId, fileId, false);
+	}
+
+	@Override
+	public void delete(String domainKey, String deviceId) throws StorageException {
+	Cassandra.get().delete(clazz, domainKey, Cassandra.argsToMap(new String[][] {{"deviceId",deviceId}}));
+		
+	}
+
+	@Override
+	public void delete(String domainKey, String deviceId, String fileId) throws StorageException {
+		Cassandra.get().delete(clazz, domainKey, Cassandra.argsToMap(new String[][] {{"deviceId",deviceId},{"fileId",fileId}}));
+		
+	}
+
+	@Override
+	public void update(String domainKey, String deviceId, String fileId, String tags, String description) throws StorageException {
+		
+		DeviceFile e = get(domainKey, deviceId, fileId, false);
+		if(null==e)throw new StorageException("Entity not found");
+
+		e.setTags(tags);
+		e.setDescription(description);
+
+		super.createOrUpdate(e);
+	}
+
+	@Override
+	public void update(String domainKey, String deviceId, String fileId, byte[] data, String mediaType) throws StorageException {
+		
+		DeviceFile e = get(domainKey, deviceId, fileId, false);
+		if(null==e)throw new StorageException("Entity not found");
+
+		e.setData(data);
+		e.setDescription(mediaType);
+
+		super.createOrUpdate(e);
+		
+	}
+
+	@Override
+	public Collection<DeviceFile> list(boolean load, String domainKey, String deviceId, int page, int pageSize)
+			throws StorageException {
+		return Cassandra.get().list(clazz, Cassandra.argsToMap(new String[][] {{"domainKey", domainKey},{"deviceId", deviceId}}), "ORDER BY \"deviceId\" ASC", pageSize, null);
+	}
+
+	@Override
+	public Collection<DeviceFile> listNext(boolean load, String domainKey, String deviceId, String fileId, int page,
+			int pageSize) throws StorageException {
+		return Cassandra.get().listNext(clazz, Cassandra.argsToMap(new String[][] {{"domainKey", domainKey},{"deviceId", deviceId}}), "AND \"fileId\" > ?", Arrays.asList(fileId), "ORDER BY \"fileId\" ASC", pageSize, null);
+	}
+
+}

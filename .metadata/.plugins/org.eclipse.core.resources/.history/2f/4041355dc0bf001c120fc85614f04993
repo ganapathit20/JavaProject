@@ -1,0 +1,99 @@
+package io.boodskap.iot.api.impl;
+
+import javax.ws.rs.core.Response;
+
+import io.boodskap.iot.api.ApiResponseMessage;
+import io.boodskap.iot.api.DfriendApiService;
+import io.boodskap.iot.api.NotFoundException;
+import io.boodskap.iot.api.model.CIDeviceFriend;
+import io.boodskap.iot.api.model.CustomQuery;
+
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaMSF4JServerCodegen", date = "2022-04-19T14:15:44.345569+05:30[Asia/Kolkata]")
+public class DfriendApiServiceImpl extends DfriendApiService {
+	
+	@Override
+	public Response countAllDeviceFriendss() throws NotFoundException {
+		// do some magic!
+		return Response.ok().entity(new ApiResponseMessage(ApiResponseMessage.OK, "magic!")).build();
+	}
+
+	@Override
+	public Response countDomainDeviceFriendss(String domainKey) throws NotFoundException {
+		// do some magic!
+		return Response.ok().entity(new ApiResponseMessage(ApiResponseMessage.OK, "magic!")).build();
+	}
+
+	@Override
+	public Response countDomainDevicesFriendss(String domainKey, String deviceId) throws NotFoundException {
+		// do some magic!
+		return Response.ok().entity(new ApiResponseMessage(ApiResponseMessage.OK, "magic!")).build();
+	}
+
+	@Override
+	public Response deleteAllDeviceFriends() throws NotFoundException {
+		// do some magic!
+		return Response.ok().entity(new ApiResponseMessage(ApiResponseMessage.OK, "magic!")).build();
+	}
+
+	@Override
+	public Response deleteAllDevicesFriends(String domainKey, String deviceId) throws NotFoundException {
+		// do some magic!
+		return Response.ok().entity(new ApiResponseMessage(ApiResponseMessage.OK, "magic!")).build();
+	}
+
+	@Override
+	public Response deleteAllDomainDeviceFriends(String domainKey) throws NotFoundException {
+		// do some magic!
+		return Response.ok().entity(new ApiResponseMessage(ApiResponseMessage.OK, "magic!")).build();
+	}
+
+	@Override
+	public Response deleteDeviceFriend(String domainKey, String deviceId, String friendId) throws NotFoundException {
+		// do some magic!
+		return Response.ok().entity(new ApiResponseMessage(ApiResponseMessage.OK, "magic!")).build();
+	}
+
+	@Override
+	public Response deleteDeviceFriendssByQuery(String domainKey, String body) throws NotFoundException {
+		// do some magic!
+		return Response.ok().entity(new ApiResponseMessage(ApiResponseMessage.OK, "magic!")).build();
+	}
+
+	@Override
+	public Response getDeviceFriend(String domainKey, String deviceId, String friendId) throws NotFoundException {
+		// do some magic!
+		return Response.ok().entity(new ApiResponseMessage(ApiResponseMessage.OK, "magic!")).build();
+	}
+
+	@Override
+	public Response listDeviceFriendss(String domainKey, String deviceId, Integer page, Integer pageSize, Boolean next,
+			String friendId) throws NotFoundException {
+		// do some magic!
+		return Response.ok().entity(new ApiResponseMessage(ApiResponseMessage.OK, "magic!")).build();
+	}
+
+	@Override
+	public Response searchDeviceFriendss(String domainKey, Integer page, Integer pageSize, String body)
+			throws NotFoundException {
+		// do some magic!
+		return Response.ok().entity(new ApiResponseMessage(ApiResponseMessage.OK, "magic!")).build();
+	}
+
+	@Override
+	public Response selectDeviceFriendssByQuery(String domainKey, CustomQuery customQuery) throws NotFoundException {
+		// do some magic!
+		return Response.ok().entity(new ApiResponseMessage(ApiResponseMessage.OK, "magic!")).build();
+	}
+
+	@Override
+	public Response updateDeviceFriendssByQuery(String domainKey, CustomQuery customQuery) throws NotFoundException {
+		// do some magic!
+		return Response.ok().entity(new ApiResponseMessage(ApiResponseMessage.OK, "magic!")).build();
+	}
+
+	@Override
+	public Response upsertDeviceFriend(CIDeviceFriend ciDeviceFriend) throws NotFoundException {
+		// do some magic!
+		return Response.ok().entity(new ApiResponseMessage(ApiResponseMessage.OK, "magic!")).build();
+	}
+}

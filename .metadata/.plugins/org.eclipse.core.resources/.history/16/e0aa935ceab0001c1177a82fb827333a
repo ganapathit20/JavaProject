@@ -1,0 +1,5 @@
+package com.dev.storage.cassandra.dao.model;
+
+public class Students {
+
+}

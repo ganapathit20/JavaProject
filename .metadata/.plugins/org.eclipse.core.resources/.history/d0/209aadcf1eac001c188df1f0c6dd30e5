@@ -1,0 +1,62 @@
+package io.boodskap.iot.spi.storage.cassandra.dao;
+
+import java.util.Arrays;
+import java.util.Collection;
+
+import io.boodskap.iot.StorageException;
+import io.boodskap.iot.dao.AssetDeviceDAO;
+import io.boodskap.iot.model.pojo.AssetDevice;
+import io.boodskap.iot.spi.storage.cassandra.Cassandra;
+
+public class AssetDeviceDAOImpl extends BaseDomainDAO<AssetDevice> implements AssetDeviceDAO<AssetDevice> {
+
+	private static final AssetDeviceDAOImpl instance = new AssetDeviceDAOImpl();
+
+	protected AssetDeviceDAOImpl() {
+		super(AssetDevice.class);
+	}
+
+	public static final AssetDeviceDAOImpl get() {
+		return instance;
+	}
+
+	@Override
+	public AssetDevice create(String domainKey, String assetId, String deviceId) {
+		return new AssetDevice(domainKey, assetId, deviceId);
+	}
+
+	@Override
+	public AssetDevice get(String domainKey, String assetId, String deviceId) throws StorageException {
+		return Cassandra.get().get(clazz, false, Cassandra.argsToMap(new String[][] {{"domainKey", domainKey},{"assetId", assetId},{"deviceId", deviceId}}),null);
+	}
+
+	@Override
+	public void delete(String domainKey, String assetId, String deviceId) throws StorageException {
+		Cassandra.get().delete(clazz, domainKey, Cassandra.argsToMap(new String[][] {{"assetId", assetId}}));
+
+	}
+
+	@Override
+	public void delete(String domainKey, String assetId) throws StorageException {
+		Cassandra.get().delete(clazz,domainKey,Cassandra.argsToMap(new String[][] {{"assetId", assetId}}));
+
+	}
+
+	@Override
+	public long count(String domainKey, String assetId) throws StorageException {
+		return Cassandra.get().count(clazz, Cassandra.argsToMap(new String[][] {{"domainKey", domainKey},{"assetId", assetId}}));
+	}
+
+	@Override
+	public Collection<AssetDevice> list(String domainKey, String assetId, int page, int pageSize)
+			throws StorageException {
+		return Cassandra.get().list(clazz, Cassandra.argsToMap(new String[][] {{"domainKey", domainKey},{"assetId", assetId}}), "ORDER BY \"assetId\" ASC", pageSize,null);
+	}
+
+	@Override
+	public Collection<AssetDevice> listNext(String domainKey, String assetId, String deviceId, int page, int pageSize)
+			throws StorageException {
+		return Cassandra.get().listNext(clazz, Cassandra.argsToMap(new String[][] {{"domainKey", domainKey},{"alexaId", assetId},{"deviceId", deviceId}}), "AND \"deviceId\" > ?", Arrays.asList(deviceId), "ORDER BY \"deviceId\" ASC", pageSize,null);
+	}
+
+}

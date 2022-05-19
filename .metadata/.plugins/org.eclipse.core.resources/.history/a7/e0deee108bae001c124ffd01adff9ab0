@@ -1,0 +1,17 @@
+package com.example.core.CoreJavaExample;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class CoreJavaExampleApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(CoreJavaExampleApplication.class, args);
+
+		private static final String url = "jdbc:mysql://localhost:3306/mysql";
+		private static final String user = "user";
+		private static final String password = "password";
+	}
+
+}

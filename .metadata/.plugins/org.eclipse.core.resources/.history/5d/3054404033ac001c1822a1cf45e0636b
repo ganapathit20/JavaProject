@@ -1,0 +1,185 @@
+package io.boodskap.iot.spi.storage.cassandra;
+
+import java.io.InputStream;
+import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
+import org.tinylog.Logger;
+
+import com.datastax.oss.driver.api.core.CqlSession;
+import com.datastax.oss.driver.api.core.CqlSessionBuilder;
+import com.datastax.oss.driver.internal.core.metadata.DefaultEndPoint;
+
+import io.boodskap.iot.StorageException;
+import io.boodskap.iot.model.IEntity;
+
+public class CassandraSession{
+
+	private static final CassandraSession instance = new CassandraSession();
+
+	private CqlSession session;
+
+	private CassandraSession() {
+	}
+
+	protected static final CassandraSession get() {
+		return instance;
+	}
+
+	protected CqlSession getSession() {
+		return session;
+	}
+
+	@SuppressWarnings("unchecked")
+	protected void init(CassandraConfig config) throws StorageException{
+
+		try {
+
+			if(null != session && !session.isClosed()) return;
+
+			Logger.info("Initializing cassandra storage...");
+
+			final CqlSessionBuilder builder = CqlSession.builder();
+
+			config.getSeeds().forEach(cs -> {
+				builder.addContactEndPoint(new DefaultEndPoint(new InetSocketAddress(cs.getHost(), cs.getPort())));
+			});
+
+			if(config.isAuthenticate()) {
+				builder.withAuthCredentials(config.getUserName(), config.getPassword());
+			}
+
+			if(StringUtils.isNotBlank(config.getLocalDatacenterProfile())) {
+				builder.withLocalDatacenter(config.getLocalDatacenterProfile(), config.getLocalDatacenter());
+			}else {
+				builder.withLocalDatacenter(config.getLocalDatacenter());
+			}
+
+			session = builder.build();
+
+			String keyspace = IOUtils.toString(CassandraStorage.class.getResourceAsStream("/cassandra/keyspace.cql"), "UTF-8");
+			keyspace = String.format(keyspace, config.getKeyspace());
+
+			session.execute(keyspace);
+
+			session.close();
+
+			builder.withKeyspace(config.getKeyspace());
+
+			session = builder.build();
+
+			final List<String> indexes = IOUtils.readLines(CassandraStorage.class.getResourceAsStream("/cassandra/indexes.cql"), "UTF-8");
+			final Properties tables = new Properties();
+			tables.load(CassandraStorage.class.getResourceAsStream("/cassandra/mapping.properties"));
+			Map<Object, Object> map = new HashMap<>(tables);
+
+			final List<String> rindexes = new ArrayList<>();
+			indexes.forEach(r -> {
+				if(StringUtils.isBlank(r) || r.startsWith("--")) {
+					rindexes.add(r);
+				}
+			});
+
+			indexes.removeAll(rindexes);
+
+			final int total = indexes.size() + map.size();
+			int current = 0;
+			int errors = 0;
+
+			for(Map.Entry<Object, Object> me : map.entrySet()) {
+
+				Logger.debug("Executing {} / {} Entity: {} Key: {}", ++current, total, me.getKey().toString().substring(27), me.getValue());
+
+				final String val = me.getValue().toString();
+				final String table = val.substring(0, val.indexOf(":"));
+
+				String cql = getCql(table);
+
+				Class<? extends IEntity> clazz = (Class<? extends IEntity>) Class.forName(me.getKey().toString());
+
+				boolean created = false;
+
+				try {
+
+					session.execute(cql);
+
+					created = true;
+
+					Cassandra.get().register(clazz, me.getValue().toString());
+
+				}catch(Exception ex) {
+					++errors;
+					Logger.error(ex);
+					Logger.error(cql);
+					//Logger.error(ex.getMessage());
+				}
+
+				cql = getIdxCql(me.getValue().toString());
+
+				if(created && cql != null) {
+
+					Logger.debug("Executing {} / {} Lucene Index", current, total);
+
+					try {
+						session.execute(cql);						
+					}catch(Exception ex) {
+						++errors;
+						Logger.error(ex);
+						Logger.error(cql);
+					}
+				}
+			}
+
+			for(String index : indexes){
+				try {
+					Logger.debug("Executing {} / {} Index", ++current, total);					
+					session.execute(index);
+				}catch(Exception ex) {
+					++errors;
+					Logger.error(ex);
+				}
+			};
+
+			if(errors > 0) {
+				String msg = String.format("%d scripts failed, storage is not initialized properly", errors);
+				Logger.error(msg);
+				throw new StorageException(msg);
+			}
+
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	private String getCql(String entity) throws Exception{
+		String resource = String.format("/cql/%s.cql", entity);
+		return IOUtils.toString(CassandraStorage.class.getResourceAsStream(resource), "UTF-8");
+	}
+
+	private String getIdxCql(String entity) throws Exception{
+		String resource = String.format("/lucene/%s.idx.cql", entity);
+		InputStream in = CassandraStorage.class.getResourceAsStream(resource);
+		if(null == in) return null;
+		return IOUtils.toString(in, "UTF-8");
+	}
+
+	public static void close() {
+
+		if(null != instance.session && !instance.session.isClosed()) {
+			instance.session.close();
+		}
+
+		instance.session = null;
+	}
+
+}

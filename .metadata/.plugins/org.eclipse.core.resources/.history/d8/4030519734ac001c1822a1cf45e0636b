@@ -1,0 +1,52 @@
+package io.boodskap.iot.spi.storage.cassandra.dao;
+
+import java.util.Arrays;
+import java.util.Collection;
+
+import io.boodskap.iot.StorageException;
+import io.boodskap.iot.dao.AssetDAO;
+import io.boodskap.iot.model.IAsset;
+import io.boodskap.iot.model.pojo.Asset;
+import io.boodskap.iot.spi.storage.cassandra.Cassandra;
+
+public class AssetDAOImpl extends BaseDomainDAO<Asset> implements AssetDAO<Asset> {
+
+	private static final AssetDAOImpl instance = new AssetDAOImpl();
+
+	protected AssetDAOImpl() {
+		super(Asset.class);
+	}
+
+	public static final AssetDAOImpl get() {
+		return instance;
+	}
+
+	@Override
+	public IAsset create(String domainKey, String assetId) {
+		return new Asset(domainKey, assetId);
+	}
+
+	@Override
+	public Asset get(String domainKey, String id) throws StorageException {
+		return Cassandra.get().get(clazz, false, Cassandra.argsToMap(new String[][] {{"domainKey", domainKey},{"assetId", id}}),null);
+	}
+
+	@Override
+	public void delete(String domainKey, String assetId) throws StorageException {
+		Cassandra.get().delete(clazz, domainKey, Cassandra.argsToMap(new String[][] {{"assetId", assetId}}));
+
+	}
+
+	@Override
+	public Collection<Asset> list(String domainKey, int page, int pageSize) throws StorageException {
+		return Cassandra.get().list(clazz, Cassandra.argsToMap(new String[][] {{"domainKey", domainKey}}), "ORDER BY \"assetId\" ASC", pageSize, null);
+	}
+
+	@Override
+	public Collection<Asset> listNext(String domainKey, String assetId, int page, int pageSize)
+			throws StorageException {
+		return Cassandra.get().listNext(clazz, Cassandra.argsToMap(new String[][] {{"domainKey", domainKey},{"assetId", assetId}}), "AND \"assetId\" > ?", Arrays.asList(assetId), "ORDER BY \"assetId\" ASC", pageSize,null);
+	}
+
+
+}

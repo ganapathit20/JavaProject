@@ -1,0 +1,69 @@
+package io.boodskap.iot.spi.storage.cassandra.dao;
+
+import java.util.Arrays;
+import java.util.Collection;
+
+import io.boodskap.iot.StorageException;
+import io.boodskap.iot.dao.DeviceFriendDAO;
+import io.boodskap.iot.dao.EntityIterator;
+import io.boodskap.iot.model.pojo.DeviceFriend;
+import io.boodskap.iot.spi.storage.cassandra.Cassandra;
+
+public class DeviceFriendDAOImpl extends BaseDomainDAO<DeviceFriend> implements DeviceFriendDAO<DeviceFriend> {
+
+	private static final DeviceFriendDAOImpl instance = new DeviceFriendDAOImpl();
+
+	private DeviceFriendDAOImpl() {
+		super(DeviceFriend.class);
+	}
+
+	public static DeviceFriendDAOImpl get() {
+		return instance;
+	}
+
+	@Override
+	public DeviceFriend create(String domainKey, String deviceId, String friendId) {
+		return new DeviceFriend(domainKey, deviceId, friendId);
+	}
+
+	@Override
+	public DeviceFriend get(String domainKey, String deviceId, String friendId) throws StorageException {
+		return Cassandra.get().get(clazz, false, Cassandra.argsToMap(new String[][]{{"domainKey",domainKey},{"deviceId",deviceId},{"friendId",friendId}}), null);
+	}
+
+	@Override
+	public void delete(String domainKey, String deviceId, String friendId) throws StorageException {
+		Cassandra.get().delete(clazz, domainKey, Cassandra.argsToMap(new String[][] {{"deviceId",deviceId},{"friendId",friendId}}));
+
+	}
+
+	@Override
+	public void delete(String domainKey, String deviceId) throws StorageException {
+		Cassandra.get().delete(clazz, domainKey, Cassandra.argsToMap(new String[][]{{"deviceId",deviceId}}));
+
+	}
+
+	@Override
+	public long count(String domainKey, String deviceId) throws StorageException {
+		return Cassandra.get().count(clazz, Cassandra.argsToMap(new String[][]{{"domainKey",domainKey},{"deviceId",deviceId}}));
+	}
+
+	@Override
+	public EntityIterator<DeviceFriend> load(String domainKey, String deviceId) throws StorageException {
+		return Cassandra.get().load(clazz, Cassandra.argsToMap(new String[][]{{"domainKey",domainKey},{"deviceId",deviceId}}),null);
+	}
+
+	@Override
+	public Collection<DeviceFriend> list(String domainKey, String deviceId, int page, int pageSize)
+			throws StorageException {
+		return Cassandra.get().list(clazz, Cassandra.argsToMap(new String[][] {{"domainKey", domainKey},{"deviceId", deviceId}}), "ORDER BY \"friendId\" ASC", pageSize, null);
+	}
+
+	@Override
+	public Collection<DeviceFriend> listNext(String domainKey, String deviceId, String friendId, int page, int pageSize)
+			throws StorageException {
+		return Cassandra.get().listNext(clazz, Cassandra.argsToMap(new String[][] {{"domainKey", domainKey},{"deviceId", deviceId},{"friendId", friendId}}), "AND \"friendId\" > ?", Arrays.asList(friendId), "ORDER BY \"friendId\" ASC", pageSize, null);
+	}
+
+
+}

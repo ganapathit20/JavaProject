@@ -1,0 +1,145 @@
+package io.boodskap.iot.api.impl;
+
+import java.util.Collection;
+
+import javax.ws.rs.core.Response;
+
+import org.json.JSONObject;
+
+import io.boodskap.iot.SearchResult;
+import io.boodskap.iot.ThreadContext;
+import io.boodskap.iot.api.DfriendApiService;
+import io.boodskap.iot.api.NotFoundException;
+import io.boodskap.iot.api.StatusCode;
+import io.boodskap.iot.api.model.CIDeviceFriend;
+import io.boodskap.iot.api.model.Count;
+import io.boodskap.iot.api.model.CustomQuery;
+import io.boodskap.iot.model.IDeviceFriend;
+
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaMSF4JServerCodegen", date = "2022-04-19T14:15:44.345569+05:30[Asia/Kolkata]")
+public class DfriendApiServiceImpl extends DfriendApiService {
+
+	@Override
+	public Response countAllDeviceFriendss() throws NotFoundException {
+
+		final long total = IDeviceFriend.count();
+
+		return StatusCode.OK(new Count().total(total));
+	}
+
+	@Override
+	public Response countDomainDeviceFriendss(String domainKey) throws NotFoundException {
+
+		final long total = IDeviceFriend.count(domainKey);
+
+		return StatusCode.OK(new Count().total(total));
+	}
+
+	@Override
+	public Response countDomainDevicesFriendss(String domainKey, String deviceId) throws NotFoundException {
+
+		final long total = IDeviceFriend.count(domainKey);
+
+		return StatusCode.OK(new Count().total(total));
+	}
+
+	@Override
+	public Response deleteAllDeviceFriends() throws NotFoundException {
+
+		IDeviceFriend.delete();
+
+		return StatusCode.OK();
+	}
+
+	@Override
+	public Response deleteAllDevicesFriends(String domainKey, String deviceId) throws NotFoundException {
+
+		IDeviceFriend.delete(domainKey, deviceId);
+
+		return StatusCode.OK();
+	}
+
+	@Override
+	public Response deleteAllDomainDeviceFriends(String domainKey) throws NotFoundException {
+
+		IDeviceFriend.delete(domainKey);
+
+		return StatusCode.OK();
+	}
+
+	@Override
+	public Response deleteDeviceFriend(String domainKey, String deviceId, String friendId) throws NotFoundException {
+
+		IDeviceFriend.delete(domainKey, deviceId, friendId);
+
+		return StatusCode.OK();
+	}
+
+	@Override
+	public Response deleteDeviceFriendssByQuery(String domainKey, String body) throws NotFoundException {
+
+		IDeviceFriend.deleteByQuery(domainKey, body);
+
+		return StatusCode.OK();
+	}
+
+	@Override
+	public Response getDeviceFriend(String domainKey, String deviceId, String friendId) throws NotFoundException {
+
+		IDeviceFriend e = IDeviceFriend.get(domainKey, deviceId, friendId);
+
+		return StatusCode.OK(e);
+	}
+
+	@Override
+	public Response listDeviceFriendss(String domainKey, String deviceId, Integer page, Integer pageSize, Boolean next,
+			String friendId) throws NotFoundException {
+
+		next = (null != next) ? next : false;
+
+		final Collection<IDeviceFriend> list;
+
+		if (!next)
+			list = IDeviceFriend.list(domainKey, deviceId, page, pageSize);
+		else
+			list = IDeviceFriend.listNext(domainKey, deviceId, friendId, page, pageSize);
+
+		return StatusCode.OK(list);
+	}
+
+	@Override
+	public Response searchDeviceFriendss(String domainKey, Integer page, Integer pageSize, String body)
+			throws NotFoundException {
+
+		SearchResult<IDeviceFriend> sr = IDeviceFriend.searchByQuery(domainKey, body, page, pageSize);
+
+		return StatusCode.OK(sr);
+	}
+
+	@Override
+	public Response selectDeviceFriendssByQuery(String domainKey, CustomQuery customQuery) throws NotFoundException {
+
+		SearchResult<JSONObject> sr = IDeviceFriend.selectByQuery(domainKey, customQuery.getWhat(), customQuery.getHow());
+
+		return StatusCode.OK(sr);
+	}
+
+	@Override
+	public Response updateDeviceFriendssByQuery(String domainKey, CustomQuery customQuery) throws NotFoundException {
+
+		JSONObject res = IDeviceFriend.updateByQuery(customQuery.getWhat(), customQuery.getHow());
+
+		return StatusCode.OK(res);
+	}
+
+	@Override
+	public Response upsertDeviceFriend(CIDeviceFriend ciDeviceFriend) throws NotFoundException {
+
+		IDeviceFriend e = ThreadContext.jsonToObject(new JSONObject(ciDeviceFriend), IDeviceFriend.clazz());
+		e.save();
+
+		e = IDeviceFriend.get(e.getDomainKey(),e.getDeviceId(),e.getFriendId());
+
+		return StatusCode.OK(e);
+	}
+}

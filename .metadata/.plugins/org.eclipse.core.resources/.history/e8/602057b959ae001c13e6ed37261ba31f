@@ -1,0 +1,13 @@
+package com.data.storage;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class StorageFactoryApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(StorageFactoryApplication.class, args);
+	}
+
+}

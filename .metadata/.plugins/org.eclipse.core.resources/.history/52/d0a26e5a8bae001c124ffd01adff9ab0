@@ -1,0 +1,23 @@
+package com.example.core.CoreJavaExample;
+
+import java.sql.*;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class CoreJavaExampleApplication {
+
+	public static void main(String[] args) throws Exception {
+		SpringApplication.run(CoreJavaExampleApplication.class, args);
+
+		final String url = "jdbc:mysql://localhost:3306/mysql";
+		final String user = "root";
+		final String password = "";
+		
+		 Class.forName("com.mysql.cj.jdbc.Driver");
+		 
+		 Connection connection = DriverManager.getConnection(url, user, password);
+	}
+
+}

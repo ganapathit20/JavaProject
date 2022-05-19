@@ -1,0 +1,5 @@
+package io.boodskap.iot.test;
+
+public class TempTest {
+
+}

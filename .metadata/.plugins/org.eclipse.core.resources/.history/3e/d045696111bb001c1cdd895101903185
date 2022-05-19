@@ -1,0 +1,17 @@
+CREATE TABLE IF NOT EXISTS dbtables
+(
+	"domainKey" varchar,
+	"metaDataId" varchar,
+	"table" varchar,
+	"catalog" varchar,
+	"schema" varchar,
+	"fields" blob,
+	"name" varchar,
+	"description" varchar,
+	"extraProperties" varchar,
+	"createdBy" varchar,
+	"updatedBy" varchar,
+	"registeredStamp" timestamp,
+	"updatedStamp" timestamp,
+	PRIMARY KEY (("domainKey"), "metaDataId", "table")
+)WITH CLUSTERING ORDER BY ("metaDataId" ASC, "table" ASC);

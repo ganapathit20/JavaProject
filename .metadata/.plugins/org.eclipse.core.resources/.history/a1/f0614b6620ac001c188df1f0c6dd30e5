@@ -1,0 +1,1387 @@
+package io.boodskap.iot.spi.storage.cassandra;
+
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.lang3.StringUtils;
+import org.json.JSONObject;
+import org.tinylog.Logger;
+
+import com.datastax.oss.driver.api.core.cql.BoundStatement;
+import com.datastax.oss.driver.api.core.cql.PreparedStatement;
+import com.datastax.oss.driver.api.core.cql.ResultSet;
+import com.datastax.oss.driver.api.core.cql.Row;
+import com.datastax.oss.driver.api.core.cql.SimpleStatement;
+import com.datastax.oss.driver.api.core.cql.SimpleStatementBuilder;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import io.boodskap.iot.SearchResult;
+import io.boodskap.iot.StorageException;
+import io.boodskap.iot.model.IStorageObject;
+import io.boodskap.iot.spi.storage.ResultSetToJSON;
+import io.boodskap.iot.util.PebbleUtil;
+
+public class Cassandra {
+
+	private static final Cassandra instance = new Cassandra();
+
+	public static final ObjectMapper mapper = new ObjectMapper();
+
+	private final Map<String, List<String>> KEYS = new HashMap<>();
+
+	private final Map<Class<? extends IStorageObject>, String> TABLES = new HashMap<>();
+	private final Map<StatementCacheable, PreparedStatement> STATEMENTS = new HashMap<>();
+
+	static {
+		mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, true);
+		mapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS'Z'"));
+		mapper.configure(DeserializationFeature.FAIL_ON_NULL_CREATOR_PROPERTIES, true);
+		mapper.configure(DeserializationFeature.FAIL_ON_NULL_FOR_PRIMITIVES, true);
+		//mapper.configure(MapperFeature.ACCEPT_CASE_INSENSITIVE_PROPERTIES, true);
+		//mapper.configure(Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true);
+		//mapper.configure(Feature.ALLOW_MISSING_VALUES, true);
+		
+	}
+	
+	private Cassandra() {
+	}
+
+	public static final Cassandra get() {
+		return instance;
+	}
+
+	public static <T> T jsonToObject(String dataJson, Class<T> c){
+		try {
+			dataJson = dataJson.replaceAll("\\\\", "");
+			dataJson = dataJson.replaceAll("\"\"", "\"");
+			return mapper.readValue(dataJson, c);
+		} catch (Exception e) {
+			throw new StorageException(e);
+		}
+	}
+
+	public static interface EntityConverter<T extends IStorageObject>{
+		public T convert(Row row);
+	}
+
+	public static class EntityIterator<T extends IStorageObject> implements io.boodskap.iot.dao.EntityIterator<T>{
+
+		private final Class<T> clazz;
+		private final Iterator<Row> iter;
+		private final EntityConverter<T> converter;
+
+		public EntityIterator(Class<T> clazz, Iterator<Row> iter, EntityConverter<T> converter) {
+			this.clazz = clazz;
+			this.iter = iter;
+			this.converter = converter;
+		}
+
+		@Override
+		public boolean hasNext() {
+			return iter.hasNext();
+		}
+
+		@Override
+		public T next() {
+			try {
+				Row r = iter.next();
+				if(null == converter) {
+
+					String dataJson = r.getString(0);
+
+					dataJson = dataJson.replaceAll("\\\\", "");
+					dataJson = dataJson.replaceAll("\"\"", "\"");
+
+					return jsonToObject(dataJson, clazz);
+				}else {
+					return converter.convert(r);
+				}
+			} catch (Exception e) {
+				throw new StorageException(e);
+			}
+		}
+
+	}
+
+
+	public static Map<String, Object> argsToMap(String[][] args){
+
+		Map<String, Object> map = new HashMap<>();
+
+		for(int i=0;i<args.length;i++) {
+
+			String name = args[i][0];
+			String value = args[i][1];
+
+			map.put(name, value);
+		}
+
+		return map;
+	}
+
+	protected void register(Class<? extends IStorageObject> entity, String table) {
+
+		final String tableName;
+		final List<String> keys;
+		final int index = table.indexOf(":"); 
+
+		if( index != -1) {
+			tableName = table.substring(0, index);
+			keys = Arrays.asList(table.substring(index+1).split(","));
+		}else {
+			tableName = table;
+			keys = new ArrayList<>();
+		}
+
+		TABLES.put(entity, tableName);
+		KEYS.put(tableName, keys);
+	}
+
+	public String getTable(Class<? extends IStorageObject> clazz) throws StorageException {
+
+		String table = TABLES.get(clazz);
+
+		if(null == table) {
+			throw new StorageException("Table mapping not found for %s", clazz.getName());
+		}
+
+		return table;
+	}
+
+	private void checkDomainKey(Map<String, Object> args) throws StorageException{
+		if(!args.containsKey("domainKey")) throw new StorageException("domainKey argument missing");
+	}
+
+	public void save(IStorageObject entity) throws StorageException {
+		save(entity, Arrays.asList("entity"));
+	}
+
+
+	public void save(IStorageObject entity, List<String> ignoredFields) throws StorageException {
+		final String table = getTable(entity.getClass());
+
+		ObjectMapper objMapper = new ObjectMapper();
+
+		@SuppressWarnings("unchecked")
+		final Map<String, Object> map = objMapper.convertValue(entity, Map.class);
+
+		ignoredFields.forEach(fn -> {map.remove(fn);});
+
+		final  Map<String, Object> cmap = new HashMap<>();
+
+		for(Map.Entry<String, Object> me : map.entrySet()){
+			cmap.put(String.format("\"%s\"", me.getKey()), me.getValue());
+		}
+
+		String cql = String.format("INSERT INTO %s.%s JSON '%s'", CassandraStorage.config().getKeyspace(),  table, new JSONObject(cmap));
+
+		Logger.trace("Executing {}", cql);
+
+		CassandraStorage.session().execute(cql);
+	}
+
+	public <T extends IStorageObject> T get(Class<T> clazz, boolean ignoreDomain, Map<String, Object> args, EntityConverter<T> converter) throws StorageException {
+
+		if(!ignoreDomain) checkDomainKey(args);
+
+		try {
+
+			final String table = getTable(clazz);		
+
+			final StringBuilder query = new StringBuilder("SELECT JSON * FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					.append(" WHERE ");
+
+			int count = 0;
+
+			for(Map.Entry<String, Object> me : args.entrySet()) {
+				query.append("\"").append(me.getKey()).append("\"").append(" = ?");
+				++count;
+
+				if(count < args.size()) {
+					query.append(" AND ");
+				}
+			}
+
+			final StatementCacheable sc = new StatementCacheable(table, query.toString());
+
+			PreparedStatement ps = STATEMENTS.get(sc);
+
+			if(null == ps) {
+
+				Logger.debug("Preparing {}", query);
+
+				ps = CassandraStorage.session().prepare(query.toString());
+
+				STATEMENTS.put(sc, ps);
+			}
+
+			final Object[] vals = new Object[args.size()];
+
+			args.values().toArray(vals);
+
+			for(int i = 0; i<vals.length; i++) {
+				if(vals[i]==null) {
+					vals[i]	= "UNKNOW";
+				}
+			}
+
+			final BoundStatement bs = ps.bind(vals);
+
+			ResultSet rs = CassandraStorage.session().execute(bs);
+
+			Row r = rs.one();
+
+			if(null != r) {
+
+				String dataJson = r.getString(0);
+
+				dataJson = dataJson.replaceAll("\\\\", "");
+				dataJson = dataJson.replaceAll("\"\"", "\"");
+
+				T val = jsonToObject(dataJson, clazz);
+				return val;
+			}
+
+			return null;
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	public long  count(Class<? extends IStorageObject> clazz, Map<String, Object> args) throws StorageException {
+
+		try {
+
+			final String table = getTable(clazz);		
+
+			final StringBuilder query = new StringBuilder("SELECT COUNT(1) FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					.append(" WHERE ")
+					;
+
+			int count = 0;
+
+			for(Map.Entry<String, Object> me : args.entrySet()) {
+				query.append("\"").append(me.getKey()).append("\"").append(" = ?");
+				++count;
+
+				if(count < args.size()) {
+					query.append(" AND ");
+				}
+			}
+
+			final StatementCacheable sc = new StatementCacheable(table, query.toString());
+
+			PreparedStatement ps = STATEMENTS.get(sc);
+
+			if(null == ps) {
+
+				Logger.debug("Preparing {}", query);
+
+				ps = CassandraStorage.session().prepare(query.toString());
+
+				STATEMENTS.put(sc, ps);
+			}
+
+			final Object[] vals = new Object[args.size()];
+
+			args.values().toArray(vals);
+
+			final BoundStatement bs = ps.bind(vals);
+
+			ResultSet rs = CassandraStorage.session().execute(bs);
+
+			return rs.one().getLong("count");
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	public long count(Class<? extends IStorageObject> clazz) throws StorageException{
+
+		try {
+
+			final String table = getTable(clazz);		
+
+			final StringBuilder query = new StringBuilder("SELECT COUNT(*) AS total FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					.append(" ALLOW FILTERING")
+					;
+
+			Logger.trace("Executing {}", query);
+
+			SimpleStatement ss = new SimpleStatementBuilder(query.toString()).build();
+			ss.setPageSize(1000);
+
+			ResultSet rs = CassandraStorage.session().execute(ss);
+
+			return rs.one().getLong("total");
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	public long count(Class<? extends IStorageObject> clazz, String domainKey) throws StorageException{
+
+		try {
+
+			final String table = getTable(clazz);		
+
+			final StringBuilder query = new StringBuilder("SELECT COUNT(*) AS total FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					.append(" WHERE \"domainKey\" = ?")
+					;
+
+			final StatementCacheable sc = new StatementCacheable(table, query.toString());
+
+			PreparedStatement ps = STATEMENTS.get(sc);
+
+			if(null == ps) {
+
+				Logger.debug("Preparing {}", sc.getQuery());
+
+				ps = CassandraStorage.session().prepare(sc.getQuery());
+
+				STATEMENTS.put(sc, ps);
+			}
+
+			BoundStatement bs= ps.bind(domainKey);
+			bs.setPageSize(1000);
+
+			ResultSet rs = CassandraStorage.session().execute(bs);
+
+			return rs.one().getLong("total");
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	public void delete(Class<? extends IStorageObject> clazz) throws StorageException{
+
+		try {
+
+			final String table = getTable(clazz);		
+
+			final StringBuilder query = new StringBuilder("TRUNCATE ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					;
+
+			Logger.trace("Executing {}", query);
+
+			SimpleStatement ss = new SimpleStatementBuilder(query.toString()).build();
+
+			CassandraStorage.session().execute(ss);
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	public void delete(Class<? extends IStorageObject> clazz, String domainKey) throws StorageException{
+
+		try {
+
+			final String table = getTable(clazz);		
+
+			final StringBuilder query = new StringBuilder("DELETE FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					.append(" WHERE \"domainKey\" = ?")
+					;
+
+			final StatementCacheable sc = new StatementCacheable(table, query.toString());
+
+			PreparedStatement ps = STATEMENTS.get(sc);
+
+			if(null == ps) {
+
+				Logger.debug("Preparing {}", sc.getQuery());
+
+				ps = CassandraStorage.session().prepare(sc.getQuery());
+
+				STATEMENTS.put(sc, ps);
+			}
+
+			BoundStatement bs= ps.bind(domainKey);
+
+			CassandraStorage.session().execute(bs);
+
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	public void delete(Class<? extends IStorageObject> clazz, boolean ignoreDomain, Map<String, Object> args) throws StorageException {
+
+		try {
+
+			if(!ignoreDomain) checkDomainKey(args);
+
+			final String table = getTable(clazz);		
+
+			final StringBuilder query = new StringBuilder("DELETE FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					.append(" WHERE ")
+					;
+
+			int count = 0;
+
+			for(Map.Entry<String, Object> me : args.entrySet()) {
+				query.append("\"").append(me.getKey()).append("\"").append(" = ?");
+				++count;
+
+				if(count < args.size()) {
+					query.append(" AND ");
+				}
+			}
+
+			final StatementCacheable sc = new StatementCacheable(table, query.toString());
+
+			PreparedStatement ps = STATEMENTS.get(sc);
+
+			if(null == ps) {
+
+				Logger.debug("Preparing {}", query);
+
+				ps = CassandraStorage.session().prepare(query.toString());
+
+				STATEMENTS.put(sc, ps);
+			}
+
+			final Object[] vals = new Object[args.size()];
+
+			args.values().toArray(vals);
+
+			final BoundStatement bs = ps.bind(vals);
+
+			CassandraStorage.session().execute(bs);
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	public void delete(Class<? extends IStorageObject> clazz, String domainKey, Map<String, Object> args) throws StorageException {
+
+		try {
+
+			final String table = getTable(clazz);		
+
+			args.put("domainKey", domainKey);
+
+			final StringBuilder query = new StringBuilder("DELETE FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					.append(" WHERE ")
+					;
+
+			int count = 0;
+
+			for(Map.Entry<String, Object> me : args.entrySet()) {
+				query.append("\"").append(me.getKey()).append("\"").append(" = ?");
+				++count;
+
+				if(count < args.size()) {
+					query.append(" AND ");
+				}
+			}
+
+			final StatementCacheable sc = new StatementCacheable(table, query.toString());
+
+			PreparedStatement ps = STATEMENTS.get(sc);
+
+			if(null == ps) {
+
+				Logger.debug("Preparing {}", query);
+
+				ps = CassandraStorage.session().prepare(query.toString());
+
+				STATEMENTS.put(sc, ps);
+			}
+
+			final Object[] vals = new Object[args.size()];
+
+			args.values().toArray(vals);
+
+			final BoundStatement bs = ps.bind(vals);
+
+			CassandraStorage.session().execute(bs);
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	public <T extends IStorageObject> EntityIterator<T> load(Class<T> clazz, EntityConverter<T> converter) throws StorageException{
+
+		try {
+
+			final String table = getTable(clazz);		
+
+			final StringBuilder query = new StringBuilder("SELECT JSON * FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table);
+
+			Logger.trace("Executing {}", query);
+
+			SimpleStatement ss = new SimpleStatementBuilder(query.toString()).build();
+			ss.setPageSize(1000);
+
+			ResultSet rs = CassandraStorage.session().execute(ss);
+
+			return new EntityIterator<>(clazz, rs.iterator(), converter);
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	/**
+	 * 
+	 *@author Ganapathi
+	 *@since 5.0.0-00
+	 */
+	public <T extends IStorageObject> EntityIterator<T> load(Class<T> clazz, Map<String, Object> args, EntityConverter<T> converter) throws StorageException{
+
+		checkDomainKey(args);
+
+		try {
+
+			final String table = getTable(clazz);		
+
+			final StringBuilder query = new StringBuilder("SELECT JSON * FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					.append(" WHERE ");
+
+			int count = 0;
+
+			for(Map.Entry<String, Object> me : args.entrySet()) {
+				query.append("\"").append(me.getKey()).append("\"").append(" = ?");
+				++count;
+
+				if(count < args.size()) {
+					query.append(" AND ");
+				}
+			}
+
+			final StatementCacheable sc = new StatementCacheable(table, query.toString());
+
+			PreparedStatement ps = STATEMENTS.get(sc);
+
+			if(null == ps) {
+
+				Logger.debug("Preparing {}", sc.getQuery());
+
+				ps = CassandraStorage.session().prepare(sc.getQuery());
+
+				STATEMENTS.put(sc, ps);
+			}
+
+			BoundStatement bs= ps.bind();
+			bs.setPageSize(1000);
+
+			ResultSet rs = CassandraStorage.session().execute(bs);
+
+			return new EntityIterator<>(clazz, rs.iterator(), converter);
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	public <T extends IStorageObject> EntityIterator<T> load(Class<T> clazz, String domainKey, EntityConverter<T> converter) throws StorageException{
+
+		try {
+
+			final String table = getTable(clazz);		
+
+			final StringBuilder query = new StringBuilder("SELECT JSON * FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					.append(" WHERE \"domainKey\" = ?")
+					;
+
+			final StatementCacheable sc = new StatementCacheable(table, query.toString());
+
+			PreparedStatement ps = STATEMENTS.get(sc);
+
+			if(null == ps) {
+
+				Logger.debug("Preparing {}", sc.getQuery());
+
+				ps = CassandraStorage.session().prepare(sc.getQuery());
+
+				STATEMENTS.put(sc, ps);
+			}
+
+			BoundStatement bs= ps.bind(domainKey);
+			bs.setPageSize(1000);
+
+			ResultSet rs = CassandraStorage.session().execute(bs);
+
+			return new EntityIterator<>(clazz, rs.iterator(), converter);
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	public <T extends IStorageObject> List<T> list(Class<T> clazz, Map<String, Object> args, String order, int limit, EntityConverter<T> converter) throws StorageException {
+
+		checkDomainKey(args);
+
+		try {
+
+			final String table = getTable(clazz);	
+
+			final StringBuilder query = new StringBuilder("SELECT JSON * FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					.append(" WHERE ")
+					;
+
+			int count = 0;
+
+			for(Map.Entry<String, Object> me : args.entrySet()) {
+				query.append("\"").append(me.getKey()).append("\"").append(" = ?");
+				++count;
+
+				if(count < args.size()) {
+					query.append(" AND ");
+				}
+			}
+
+			if(null != order) {
+				query.append(" ").append(order);
+			}
+
+			if(limit > 0) {
+				query.append(" LIMIT ?");
+			}
+
+			final StatementCacheable sc = new StatementCacheable(table, query.toString(), order, limit);
+
+			PreparedStatement ps = STATEMENTS.get(sc);
+
+			if(null == ps) {
+
+				Logger.debug("Preparing {}", query);
+
+				ps = CassandraStorage.session().prepare(query.toString());
+
+				STATEMENTS.put(sc, ps);
+			}
+
+			final Object[] vals = new Object[args.size() + (limit > 0 ? 1 : 0)];
+
+			args.values().toArray(vals);
+
+			if(limit > 0) {
+				vals[args.size()] = limit;
+			}
+
+			final BoundStatement bs = ps.bind(vals);
+
+			ResultSet rs = CassandraStorage.session().execute(bs);
+
+			final LinkedList<T> list = new LinkedList<>();
+
+			for(Row r : rs) {
+
+				T o;
+
+				if(null == converter) {
+					o = jsonToObject(r.getString(0), clazz);
+				}else {
+					o = converter.convert(r);
+				}
+
+				list.add(o);
+			}
+
+			return list;
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	public <T extends IStorageObject> List<T> list(Class<T> clazz, String order, int limit, EntityConverter<T> converter) throws StorageException {
+
+		try {
+
+			final String table = getTable(clazz);	
+
+			final StringBuilder query = new StringBuilder("SELECT JSON * FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					;
+
+			if(null != order) {
+				query.append(" ").append(order);
+			}
+
+			if(limit > 0) {
+				query.append(" LIMIT ?");
+			}
+
+			final StatementCacheable sc = new StatementCacheable(table, query.toString(), order, limit);
+
+			PreparedStatement ps = STATEMENTS.get(sc);
+
+			if(null == ps) {
+
+				Logger.debug("Preparing {}", query);
+
+				ps = CassandraStorage.session().prepare(query.toString());
+
+				STATEMENTS.put(sc, ps);
+			}
+
+			final BoundStatement bs = ps.bind(limit);
+
+			ResultSet rs = CassandraStorage.session().execute(bs);
+
+			final LinkedList<T> list = new LinkedList<>();
+
+			for(Row r : rs) {
+
+				T o;
+
+				if(null == converter) {
+					o = jsonToObject(r.getString(0), clazz);
+				}else {
+					o = converter.convert(r);
+				}
+
+				list.add(o);
+			}
+
+			return list;
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	public <T extends IStorageObject> List<T> listNext(Class<T> clazz, String filter, List<Object> filterParams, String order, int limit, EntityConverter<T> converter) throws StorageException {
+
+		try {
+
+			final String table = getTable(clazz);	
+
+			final StringBuilder query = new StringBuilder("SELECT JSON * FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					.append(" WHERE ")
+					;
+
+			query.append(" ").append(filter);
+
+			if(null != order) {
+				query.append(" ").append(order);
+			}
+
+			query.append(" LIMIT ?");
+
+			final StatementCacheable sc = new StatementCacheable(table, query.toString(), order, limit);
+			sc.setQuery(filter);
+
+			PreparedStatement ps = STATEMENTS.get(sc);
+
+			if(null == ps) {
+
+				Logger.debug("Preparing {}", query);
+
+				ps = CassandraStorage.session().prepare(query.toString());
+
+				STATEMENTS.put(sc, ps);
+			}
+
+			final Object[] vals = new Object[filterParams.size() + 1];
+
+			for(int i=0;i<vals.length;i++) {
+				vals[i] = filterParams.get(i);
+			}
+
+			vals[vals.length -1] = limit;
+
+			final BoundStatement bs = ps.bind(vals);
+
+			ResultSet rs = CassandraStorage.session().execute(bs);
+
+			final LinkedList<T> list = new LinkedList<>();
+
+			for(Row r : rs) {
+
+				T o;
+
+				if(null == converter) {
+					o = jsonToObject(r.getString(0), clazz);
+				}else {
+					o = converter.convert(r);
+				}
+
+				list.add(o);
+			}
+
+			return list;
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	public <T extends IStorageObject> List<T> listNext(Class<T> clazz, Map<String, Object> args, String filter, List<Object> filterParams, String order, int limit, EntityConverter<T> converter) throws StorageException {
+
+		checkDomainKey(args);
+
+		try {
+
+			final String table = getTable(clazz);	
+
+			final StringBuilder query = new StringBuilder("SELECT JSON * FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					.append(" WHERE ")
+					;
+
+			int count = 0;
+
+			for(Map.Entry<String, Object> me : args.entrySet()) {
+				query.append("\"").append(me.getKey()).append("\"").append(" = ?");
+				++count;
+
+				if(count < args.size()) {
+					query.append(" AND ");
+				}
+			}
+
+			query.append(" ").append(filter);
+
+			if(null != order) {
+				query.append(" ").append(order);
+			}
+
+			if(limit > 0) {
+				query.append(" LIMIT ?");
+			}
+
+			final StatementCacheable sc = new StatementCacheable(table, query.toString(), order, limit);
+			//sc.setQuery(filter);
+
+			PreparedStatement ps = STATEMENTS.get(sc);
+
+			if(null == ps) {
+
+				Logger.debug("Preparing {}", query);
+
+				ps = CassandraStorage.session().prepare(query.toString());
+
+				STATEMENTS.put(sc, ps);
+			}
+
+			final Object[] vals = new Object[args.size() + filterParams.size() + (limit > 0 ? 1 : 0)];
+
+
+			args.values().toArray(vals);
+
+			for(int i=args.size();i<args.size()+filterParams.size();i++) {
+				vals[i] = filterParams.get(i-args.size());
+			}
+
+			if(limit > 0) {
+				vals[vals.length -1] = limit;
+			}
+
+			final BoundStatement bs = ps.bind(vals);
+
+			ResultSet rs = CassandraStorage.session().execute(bs);
+
+			final LinkedList<T> list = new LinkedList<>();
+
+			for(Row r : rs) {
+
+				T o;
+
+				if(null == converter) {
+					o = jsonToObject(r.getString(0), clazz);
+				}else {
+					o = converter.convert(r);
+				}
+
+				list.add(o);
+			}
+
+			return list;
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	public <T extends IStorageObject> List<T> search(Class<T> clazz, String search, int limit, EntityConverter<T> converter) throws StorageException {
+
+		try {
+
+			final String table = getTable(clazz);
+
+			final String query = PebbleUtil.mergeClasspathTemplate("templates/lucene/search.twig", Cassandra.argsToMap(new String[][] {{"TABLE", table}, {"FILTER", search}, {"LIMIT", String.valueOf(limit)}}));
+
+			ResultSet rs = CassandraStorage.session().execute(query);
+
+			final LinkedList<T> list = new LinkedList<>();
+
+			for(Row r : rs) {
+
+				T o;
+
+				if(null == converter) {
+					o = jsonToObject(r.getString(0), clazz);
+				}else {
+					o = converter.convert(r);
+				}
+				list.add(o);
+			}
+
+			return list;
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	public <T extends IStorageObject> List<T> search(Class<T> clazz, String domainKey, String search, int limit, EntityConverter<T> converter) throws StorageException {
+
+		try {
+
+			final String table = getTable(clazz);
+
+			final String query = PebbleUtil.mergeClasspathTemplate("templates/lucene/search-domain.twig", Cassandra.argsToMap(new String[][] {{"TABLE", table}, {"DKEY", domainKey}, {"FILTER", search}, {"LIMIT", String.valueOf(limit)}}));
+
+			ResultSet rs = CassandraStorage.session().execute(query);
+
+			final LinkedList<T> list = new LinkedList<>();
+
+			for(Row r : rs) {
+
+				T o;
+
+				if(null == converter) {
+					o = jsonToObject(r.getString(0), clazz);
+				}else {
+					o = converter.convert(r);
+				}
+
+				list.add(o);
+			}
+
+			return list;
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	/**
+	 * @author Ganapathi
+	 * @since 5.0.0-00
+	 */
+	public <T extends IStorageObject> List<T> search(Class<T> clazz, Map<String, Object> args, String search, int page, int pageSize, EntityConverter<T> converter) throws StorageException {
+
+		checkDomainKey(args);
+
+		try {
+
+			final String table = getTable(clazz);		
+
+			final StringBuilder query = new StringBuilder("SELECT JSON * FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					.append(" WHERE ")
+					;
+
+			for(Map.Entry<String, Object> me : args.entrySet()) {
+				query.append("\"").append(me.getKey()).append("\"").append(" = ?").append(" AND ");
+			}
+
+			query.append(search).append(" LIMIT " + pageSize).append(" ALLOW FILTERING ");
+			
+			final StatementCacheable sc = new StatementCacheable(table, query.toString());
+
+			PreparedStatement ps = STATEMENTS.get(sc);
+
+			if(null == ps) {
+
+				Logger.debug("Preparing {}", query);
+
+				ps = CassandraStorage.session().prepare(query.toString());
+
+				STATEMENTS.put(sc, ps);
+			}
+
+			final Object[] vals = new Object[args.size()];
+
+			args.values().toArray(vals);
+
+			final BoundStatement bs = ps.bind(vals);
+
+			ResultSet rs = CassandraStorage.session().execute(bs);
+
+			final List<T> list = new ArrayList<>();
+
+			new EntityIterator<T>(clazz, rs.iterator(), converter).forEachRemaining( e -> {list.add(e);});
+
+			return list;
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	/**
+	 * @author Ganapathi
+	 * @since 5.0.0-00
+	 */
+
+	public <T extends IStorageObject> List<T> search(Class<T> clazz, String search, int page, int pageSize, EntityConverter<T> converter) throws StorageException {
+
+		try {
+
+			final String table = getTable(clazz);		
+
+			final StringBuilder query = new StringBuilder("SELECT JSON * FROM ")
+					.append(CassandraStorage.config().getKeyspace())
+					.append(".")
+					.append(table)
+					.append(" WHERE ")
+					.append(search)
+					.append(" LIMIT " + pageSize)
+					.append(" ALLOW FILTERING ");
+
+			ResultSet rs = CassandraStorage.session().execute(query.toString());
+
+			final List<T> list = new ArrayList<>();
+
+			new EntityIterator<T>(clazz, rs.iterator(), converter).forEachRemaining( e -> {list.add(e);});
+
+			return list;
+
+		}catch(StorageException sx) {
+			throw sx;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	/** 
+	 * @author Ganapathi
+	 * @since 5.0.0-00
+	 */
+	public SearchResult<JSONObject> selectByQuery(Class<? extends IStorageObject> clazz, String what, String how) throws StorageException{
+
+		try {
+
+			final String table = getTable(clazz);
+
+			SearchResult<JSONObject> sr = new SearchResult<JSONObject>(new ArrayList<>());
+
+			ResultSet rs = CassandraStorage.session().execute("SELECT " + what + " FROM " + CassandraStorage.config().getKeyspace() + "." + table + (null != how ? how : ""));
+
+			ResultSetToJSON rstoj = new ResultSetToJSON((java.sql.ResultSet) rs);
+
+			while(rstoj.hasNext()) {
+				sr.getResult().add(rstoj.next());
+			}
+
+			return sr;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	/**
+	 * @author Ganapathi
+	 * @since 5.0.0-00
+	 */
+	public JSONObject deleteByQuery(Class<? extends IStorageObject> clazz, String query) throws StorageException{
+
+		try {
+
+			final JSONObject j = new JSONObject();
+			final String table = getTable(clazz);
+
+			ResultSet affected = CassandraStorage.session().execute("DELETE FROM " + CassandraStorage.config().getKeyspace() + "." + table + " WHERE " + query);
+			j.put("affected", affected);
+
+			return j;
+
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	/**
+	 * @author Ganapathi
+	 * @since 5.0.0-00
+	 */
+	public JSONObject deleteByQuery(Class<? extends IStorageObject> clazz, Map<String, Object> args, String sql) throws StorageException{
+
+		try {
+
+			final String table = getTable(clazz);
+
+			StringBuilder query = new StringBuilder("DELETE FROM " + CassandraStorage.config().getKeyspace() + "." + table  + " WHERE ");
+
+			int count = 0;
+
+			for(Map.Entry<String, Object> me : args.entrySet()) {
+				query.append("\"").append(me.getKey()).append("\"").append(" = ?");
+				++count;
+
+				if(count < args.size()) {
+					query.append(" AND ");
+				}
+			}
+
+			query.append(" ").append(sql);
+
+			final JSONObject j = new JSONObject();
+
+			ResultSet affected = CassandraStorage.session().execute(query.toString());
+
+			j.put("affected", affected);
+
+			return j;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	/**
+	 * @author Ganapathi
+	 * @since 5.0.0-00
+	 */
+	public SearchResult<JSONObject> selectByQuery(Class<? extends IStorageObject> clazz, Map<String, Object> args, String what, String how) throws StorageException{
+
+		checkDomainKey(args);
+
+		try {
+
+			final String table = getTable(clazz);
+
+			SearchResult<JSONObject> sr = new SearchResult<JSONObject>(new ArrayList<>());
+
+			StringBuilder query = new StringBuilder("SELECT JSON " + what + " FROM " + CassandraStorage.config().getKeyspace() + "." + table + " WHERE ");
+
+			int count = 0;
+
+			for(Map.Entry<String, Object> me : args.entrySet()) {
+				query.append("\"").append(me.getKey()).append("\"").append(" = ?");
+				++count;
+
+				if(count < args.size()) {
+					query.append(" AND ");
+				}
+			}
+
+			if(StringUtils.isNotBlank(how)) {
+				query.append(" ").append(how);
+			}
+
+			ResultSet rs = CassandraStorage.session().execute(query.toString());
+
+			ResultSetToJSON rstoj = new ResultSetToJSON((java.sql.ResultSet) rs);
+
+			while(rstoj.hasNext()) {
+				sr.getResult().add(rstoj.next());
+			}
+
+			return sr;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	/**
+	 * @author Ganapathi
+	 * @since 5.0.0-00
+	 */
+	public JSONObject updateByQuery(Class<? extends IStorageObject> clazz, Map<String, Object> args, String query) throws StorageException{
+
+		try {
+
+			final String table = getTable(clazz);
+
+			StringBuilder sql = new StringBuilder("UPDATE " + CassandraStorage.config().getKeyspace() + "." + table + " SET " + query + " WHERE ");
+
+			for(Map.Entry<String, Object> me : args.entrySet()) {
+				sql.append("\"").append(me.getKey()).append("\"").append(" = ?").append(" AND ");
+			}
+
+			final JSONObject j = new JSONObject();
+
+			ResultSet affected = CassandraStorage.session().execute(sql.toString());
+
+			j.put("affected", affected);
+
+			return j;
+
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	/**
+	 * @author Ganapathi
+	 * @since 5.0.0-00
+	 */
+	public JSONObject updateByQuery(Class<? extends IStorageObject> clazz, String what, String how) throws StorageException{
+
+		try {
+
+			final JSONObject j = new JSONObject();
+			final String table = getTable(clazz);
+
+			ResultSet affected = CassandraStorage.session().execute("UPDATE " + CassandraStorage.config().getKeyspace() + "." + table + " SET " + what + " WHERE " + how);
+
+			j.put("affected", affected);
+
+			return j;
+
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+
+	}
+
+	/**
+	 * 
+	 * @author Ganapathi
+	 * @since 5.0.0-00
+	 */
+	public JSONObject updateByQuery(Class<? extends IStorageObject> clazz, Map<String, Object> args, String what, String how) throws StorageException{
+
+		checkDomainKey(args);
+
+		try {
+
+			final String table = getTable(clazz);
+
+			StringBuilder query = new StringBuilder("UPDATE " + CassandraStorage.config().getKeyspace() + "." + table + " SET " + what + " WHERE ");
+
+			for(Map.Entry<String, Object> me : args.entrySet()) {
+				query.append("\"").append(me.getKey()).append("\"").append(" = ?").append(" AND ");
+			}
+
+			query.append(how);
+
+			final JSONObject j = new JSONObject();
+
+			ResultSet affected = CassandraStorage.session().execute(query.toString());
+
+			j.put("affected", affected);
+
+			return j;
+		}catch(Exception ex) {
+			throw new StorageException(ex);
+		}
+	}
+
+}

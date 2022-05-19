@@ -1,0 +1,50 @@
+package io.boodskap.iot.spi.storage.cassandra.dao;
+
+import java.util.Arrays;
+import java.util.Collection;
+
+import io.boodskap.iot.StorageException;
+import io.boodskap.iot.dao.AlexaDAO;
+import io.boodskap.iot.model.IAlexa;
+import io.boodskap.iot.model.pojo.Alexa;
+import io.boodskap.iot.spi.storage.cassandra.Cassandra;
+
+public class AlexaDAOImpl extends BaseDomainDAO<Alexa> implements AlexaDAO<Alexa>{
+
+	private static final AlexaDAOImpl instance = new AlexaDAOImpl();
+
+	private AlexaDAOImpl() {
+		super(Alexa.class);
+	}
+
+	public static final AlexaDAOImpl get() {
+		return instance;
+	}
+
+	@Override
+	public Alexa get(String domainKey, String alexaId) throws StorageException {
+		return Cassandra.get().get(clazz, false, Cassandra.argsToMap(new String[][] {{"domainKey", domainKey},{"alexaId", alexaId}}), null);
+	}
+
+	@Override
+	public void delete(String domainKey, String alexaId) throws StorageException {
+		Cassandra.get().delete(clazz, domainKey, Cassandra.argsToMap(new String[][] {{"alexaId", alexaId}}));
+
+	}
+
+	@Override
+	public Collection<Alexa> list(String domainKey, int page, int pageSize) throws StorageException {
+		return Cassandra.get().list(clazz, Cassandra.argsToMap(new String[][] {{"domainKey", domainKey}}), "ORDER BY \"alexaId\" ASC", pageSize, null);
+	}
+
+	@Override
+	public Collection<Alexa> listNext(String domainKey, String alexaId, int page, int pageSize)
+			throws StorageException {
+		return Cassandra.get().listNext(clazz, Cassandra.argsToMap(new String[][] {{"domainKey", domainKey},{"alexaId", alexaId}}), "AND \"alexaId\" > ?", Arrays.asList(alexaId), "ORDER BY \"ruleType\" ASC", pageSize, null);
+	}
+
+	@Override
+	public IAlexa create(String domainKey, String alexaId) {
+		return new Alexa(domainKey, alexaId);
+	}
+}

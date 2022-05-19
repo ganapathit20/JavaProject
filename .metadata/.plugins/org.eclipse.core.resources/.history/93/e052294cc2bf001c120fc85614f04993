@@ -1,0 +1,145 @@
+package io.boodskap.iot.api.impl;
+
+import java.util.Collection;
+
+import javax.ws.rs.core.Response;
+
+import org.json.JSONObject;
+
+import io.boodskap.iot.SearchResult;
+import io.boodskap.iot.ThreadContext;
+import io.boodskap.iot.api.ApiResponseMessage;
+import io.boodskap.iot.api.DgroupApiService;
+import io.boodskap.iot.api.NotFoundException;
+import io.boodskap.iot.api.StatusCode;
+import io.boodskap.iot.api.model.CIDeviceGroup;
+import io.boodskap.iot.api.model.Count;
+import io.boodskap.iot.api.model.CustomQuery;
+import io.boodskap.iot.model.IDeviceGroup;
+import io.boodskap.iot.model.IDeviceGroup;
+
+@javax.annotation.Generated(value = "org.openapitools.codegen.languages.JavaMSF4JServerCodegen", date = "2022-04-19T14:23:17.719244+05:30[Asia/Kolkata]")
+public class DgroupApiServiceImpl extends DgroupApiService {
+	
+	@Override
+	public Response countAllDeviceGroups() throws NotFoundException {
+	
+		final long total = IDeviceGroup.count();
+
+		return StatusCode.OK(new Count().total(total));
+	}
+
+	@Override
+	public Response countDeviceGroups(String domainKey, String ownerDeviceId) throws NotFoundException {
+	
+		final long total = IDeviceGroup.count(domainKey);
+
+		return StatusCode.OK(new Count().total(total));
+	}
+
+	@Override
+	public Response countDomainDeviceGroups(String domainKey) throws NotFoundException {
+	
+		final long total = IDeviceGroup.count(domainKey);
+
+		return StatusCode.OK(new Count().total(total));
+	}
+
+	@Override
+	public Response deleteAllDeviceGroups() throws NotFoundException {
+		
+		IDeviceGroup.delete();
+
+		return StatusCode.OK();
+	}
+
+	@Override
+	public Response deleteDeviceGroup(String domainKey, String ownerDeviceId, String groupId) throws NotFoundException {
+		
+		IDeviceGroup.delete(domainKey, ownerDeviceId, groupId);
+
+		return StatusCode.OK();
+	}
+
+	@Override
+	public Response deleteDeviceGroups(String domainKey, String ownerDeviceId) throws NotFoundException {
+		
+		IDeviceGroup.delete(domainKey, ownerDeviceId);
+
+		return StatusCode.OK();
+	}
+
+	@Override
+	public Response deleteDeviceGroupsByQuery(String domainKey, String body) throws NotFoundException {
+		
+		IDeviceGroup.deleteByQuery(domainKey, body);
+
+		return StatusCode.OK();
+	}
+
+	@Override
+	public Response deleteDomainDeviceGroups(String domainKey) throws NotFoundException {
+	
+		IDeviceGroup.delete(domainKey);
+
+		return StatusCode.OK();
+	}
+
+	@Override
+	public Response getDeviceGroup(String domainKey, String ownerDeviceId, String groupId) throws NotFoundException {
+		
+		IDeviceGroup e = IDeviceGroup.get(domainKey, deviceId, friendId);
+
+		return StatusCode.OK(e);
+	}
+
+	@Override
+	public Response listDeviceGroups(String domainKey, String ownerDeviceId, Integer page, Integer pageSize, Boolean next, String groupId) throws NotFoundException {
+		
+		next = (null != next) ? next : false;
+
+		final Collection<IDeviceGroup> list;
+
+		if (!next)
+			list = IDeviceGroup.list(domainKey, deviceId, page, pageSize);
+		else
+			list = IDeviceGroup.listNext(domainKey, deviceId, friendId, page, pageSize);
+
+		return StatusCode.OK(list);
+	}
+
+	@Override
+	public Response searchDeviceGroup(String domainKey, Integer page, Integer pageSize, String body) throws NotFoundException {
+		
+		SearchResult<IDeviceGroup> sr = IDeviceGroup.searchByQuery(domainKey, body, page, pageSize);
+
+		return StatusCode.OK(sr);
+	}
+
+	@Override
+	public Response selectDeviceGroupsByQuery(String domainKey, CustomQuery customQuery) throws NotFoundException {
+	
+		SearchResult<JSONObject> sr = IDeviceGroup.selectByQuery(domainKey, customQuery.getWhat(), customQuery.getHow());
+
+		return StatusCode.OK(sr);
+	}
+
+	@Override
+	public Response updateDeviceGroupByQuery(String domainKey, CustomQuery customQuery) throws NotFoundException {
+		
+		JSONObject res = IDeviceGroup.updateByQuery(customQuery.getWhat(), customQuery.getHow());
+
+		return StatusCode.OK(res);
+	}
+
+	@Override
+	public Response upsertDeviceGroup(CIDeviceGroup ciDeviceGroup) throws NotFoundException {
+
+		IDeviceGroup e = ThreadContext.jsonToObject(new JSONObject(ciDeviceFriend), IDeviceGroup.clazz());
+		e.save();
+
+		e = IDeviceGroup.get(e.getDomainKey(),e.getDeviceId(),e.getFriendId());
+
+		return StatusCode.OK(e);
+	}
+}
