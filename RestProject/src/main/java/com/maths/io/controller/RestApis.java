@@ -6,30 +6,13 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.util.Random;
 
-import org.json.simple.JSONObject;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.maths.io.dao.MysqlQuerys;
-
 @RestController
 public class RestApis {
-
-	@RequestMapping("/run")
-	public String run() throws Exception {
-
-		return	MysqlQuerys.insert();
-
-	}
-
-	@RequestMapping("/getBSL")
-	public JSONObject getBSL() throws Exception {
-
-		return	MysqlQuerys.readBSL();
-
-	}
 
 	@RequestMapping("/api")
 	@ResponseBody
@@ -40,7 +23,8 @@ public class RestApis {
 		
 		String sql = "SELECT * FROM boodskap";
 
-		String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+		String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+				+ "0123456789" + "abcdefghijklmnopqrstuvxyz";
 
 		StringBuilder sb = new StringBuilder();
 
