@@ -18,57 +18,95 @@ public class RestApis {
 
 	@RequestMapping("/api")
 	@ResponseBody
-	public Map<String, String> getApikey(@RequestParam("uName") String uName, @RequestParam("uPass") String uPass) throws Exception {
+	public Map<String, String> getApikey(@RequestParam("uName") String uName, @RequestParam("uPass") String uPass)
+			throws Exception {
 
 		String sql = "SELECT * FROM bsl";
 
-		String alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "0123456789" + "abcdefghijklmnopqrstuvxyz";
+		String domainKey = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-		StringBuilder sb = new StringBuilder();
+		String apiKey = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" + "0123456789" + "abcdefghijklmnopqrstuvxyz";
+
+		String token = "0123456789" + "abcdefghijklmnopqrstuvxyz";
 
 		Random random = new Random();
 
-		int length = 12;
+		int dKey = 12;
+
+		int aKey = 16;
+
+		int Token = 26;
+
+		StringBuilder ak = new StringBuilder();
+
+		StringBuilder dkey = new StringBuilder();
+
+		StringBuilder Tokens = new StringBuilder();
 
 		Class.forName("com.mysql.cj.jdbc.Driver");
 
-		Connection con = DriverManager.getConnection("jdbc:mysql://localhost:3306/boodskap", "root", "example");
+		Connection con = DriverManager.getConnection("jdbc:mysql://192.168.1.32:3306/boodskap", "root", "example");
 
 		Statement st = con.createStatement();
 
 		ResultSet rs = st.executeQuery(sql);
-		
+
 		Map<String, String> key = new HashMap<>();
 
 		while (rs.next()) {
 
 			if (rs.getString(1).contains(uName) && rs.getString(2).contains(uPass)) {
 
-				for (int i = 1; i < length; i++) {
+				key.put("Domain", rs.getString(1));
+				
+				key.put("License", "Admin License");
+				
+				key.put("DomainKey", rs.getString(3));
 
-					int index = random.nextInt(alphabet.length());
+//				do {
+//
+//					for (int i = 1; i < dKey; i++) {
+//
+//						int index = random.nextInt(domainKey.length());
+//
+//						char randomChar = domainKey.charAt(index);
+//
+//						key.put("DomainKey", dkey.append(randomChar).toString());
+//					}
+//
+//				} while (!rs.getString(1).contains(uName));
+				
 
-					char randomChar = alphabet.charAt(index);
+				for (int i = 1; i < aKey; i++) {
 
-					//Apikey
-					
-					sb.append(randomChar);
-					
-					//Token
+					int index = random.nextInt(apiKey.length());
 
-//					if (i % 5 == 0)
-//						sb.append("-");
-//					else
-//						sb.append(randomChar);
-					
-					
-					key.put("Apikey", sb.toString());
+					char randomChar = apiKey.charAt(index);
+
+					key.put("Apikey", ak.append(randomChar).toString());
 				}
+
+				for (int i = 1; i < Token; i++) {
+
+					int index = random.nextInt(token.length());
+
+					char randomChar = token.charAt(index);
+
+					if (i == 5 || i == 13 || i == 19)
+						Tokens.append("-");
+					else
+						Tokens.append(randomChar);
+
+					key.put("Token", Tokens.toString());
+				}
+
+				System.out.println("Done");
 
 			} else {
 				Map<String, String> key1 = new HashMap<>();
+				key1.put("Authentication ", "Failure");
 				return key1;
-				//return "woring input";
+				// return "woring input";
 			}
 
 		}
