@@ -13,12 +13,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.boodskap.PlatformApiIntegrate.PlatformApiIntegrate;
+
 @RestController
 public class RestApis {
 
 	@RequestMapping("/api")
 	@ResponseBody
-	public Map<String, String> getApikey(@RequestParam("uName") String uName, @RequestParam("uPass") String uPass)
+	public Map<String, Object> getApikey(@RequestParam("uName") String uName, @RequestParam("uPass") String uPass)
 			throws Exception {
 
 		String sql = "SELECT * FROM bsl";
@@ -51,7 +53,7 @@ public class RestApis {
 
 		ResultSet rs = st.executeQuery(sql);
 
-		Map<String, String> key = new HashMap<>();
+		Map<String, Object> key = new HashMap<>();
 
 		while (rs.next()) {
 
@@ -62,6 +64,8 @@ public class RestApis {
 				key.put("License", "Admin License");
 				
 				key.put("DomainKey", rs.getString(3));
+				
+				key.put("Platform Data", PlatformApiIntegrate.APIIntegrate());
 
 //				do {
 //
@@ -103,7 +107,7 @@ public class RestApis {
 				System.out.println("Done");
 
 			} else {
-				Map<String, String> key1 = new HashMap<>();
+				Map<String, Object> key1 = new HashMap<>();
 				key1.put("Authentication ", "Failure");
 				return key1;
 				// return "woring input";

@@ -12,7 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class PlatformApiIntegrate {
 	
 	
-	public static void APIIntegrate() throws Exception {
+	public static Map<String, Object> APIIntegrate() throws Exception {
 		
 		String platformAPI = "https://dev.boodskap.io/api/user/get/4e78dca0-8cc2-46fc-b5fb-d735fcf81892/mithun@gmail.com";
 
@@ -45,6 +45,7 @@ public class PlatformApiIntegrate {
 	    	  System.out.println("Key : " + entry.getKey() + " <==> Value : " + entry.getValue());
 	    	  
 	      }
+		return map;
 		 
 	}
 
