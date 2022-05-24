@@ -55,7 +55,7 @@ public class RestApis {
 
 		while (rs.next()) {
 
-			if (rs.getString(1).contains(uName) && rs.getString(2).contains(uPass)) {
+			if(rs.getString(1).equals(uName) && rs.getString(2).equals(uPass)) {
 
 				key.put("Domain", rs.getString(1));
 				
