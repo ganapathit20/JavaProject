@@ -1,4 +1,4 @@
-package io.demo;
+package io.calandtime;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -9,7 +9,7 @@ import java.util.Map.Entry;
 
 public class CalendarAndDataTime {
 
-	static public void  main(String ...strings ) throws Exception {
+	static public void  main(String ... strings ) throws Exception {
 
 		Map<String, String> sysPro = System.getenv();
 
