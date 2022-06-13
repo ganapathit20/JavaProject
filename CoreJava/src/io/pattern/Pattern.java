@@ -33,6 +33,38 @@ public class Pattern {
 			System.out.println();
 
 		}
+		
+		
+		for(int row = 0; row < 3; row++) {
+
+			for(int col = 0; col < 3; col++) {
+
+				if((row==1 && col==0) || (row==0 && col==1) || (row==1 && col==2) || (row==2 && col==1)) {
+					System.out.print("*"+""+"*"+ " ");
+				}else
+					System.out.print(row+""+col+ " ");
+			}
+			System.out.println();
+		}
+		
+		
+		for(int row = 0; row < 3; row++) {
+
+			for(int col = 3; col >row; col--) {
+
+				System.out.print("*");
+			}
+			System.out.println();
+		}
+		
+		for(int row = 0; row < 3; row++) {
+
+			for(int col = 0; col <=row; col++) {
+
+				System.out.print("*");
+			}
+			System.out.println();
+		}
 	}
 
 }
