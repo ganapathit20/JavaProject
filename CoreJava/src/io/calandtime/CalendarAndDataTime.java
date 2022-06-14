@@ -3,7 +3,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.Calendar;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -44,11 +44,11 @@ public class CalendarAndDataTime {
 
 
 		Calendar calendar = Calendar.getInstance();  
-		    
-		   System.out.println("At present Calendar's Day: " + calendar.get(Calendar.DATE)); 
-		   System.out.println("At present Calendar's Month: " + calendar.get(Calendar.MONTH));
-		   System.out.println("At present Calendar's Year: " + calendar.get(Calendar.YEAR)); 
-		   
+
+		System.out.println("At present Calendar's Day: " + calendar.get(Calendar.DATE)); 
+		System.out.println("At present Calendar's Month: " + calendar.get(Calendar.MONTH));
+		System.out.println("At present Calendar's Year: " + calendar.get(Calendar.YEAR)); 
+
 		System.out.println("The current date is : " + calendar.getTime());  
 		calendar.add(Calendar.DATE, -15);  
 		System.out.println("15 days ago: " + calendar.getTime());  
@@ -58,7 +58,16 @@ public class CalendarAndDataTime {
 		System.out.println("2 years later: " + calendar.getTime());  
 
 
-
+		//Get Day of Week in Java
+		
+		Calendar calendar1 = Calendar.getInstance();
+		System.out.println(calendar1.getTime().toString());
+		int day = calendar1.get(Calendar.DAY_OF_WEEK);
+		System.out.println("Day: " + day);
+		int hour = calendar1.get(Calendar.HOUR_OF_DAY);
+		System.out.println("Hour: " + hour);
+		int minute = calendar1.get(Calendar.MINUTE);
+		System.out.println("Minute: " + minute);
 
 	}
 }
