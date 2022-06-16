@@ -5,6 +5,8 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Calendar;
 import java.util.Map;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.Map.Entry;
 
 public class CalendarAndDataTime {
@@ -59,7 +61,7 @@ public class CalendarAndDataTime {
 
 
 		//Get Day of Week in Java
-		
+
 		Calendar calendar1 = Calendar.getInstance();
 		System.out.println(calendar1.getTime().toString());
 		int day = calendar1.get(Calendar.DAY_OF_WEEK);
@@ -68,6 +70,17 @@ public class CalendarAndDataTime {
 		System.out.println("Hour: " + hour);
 		int minute = calendar1.get(Calendar.MINUTE);
 		System.out.println("Minute: " + minute);
+
+
+		//Timer Concept
+		Timer timer = new Timer();
+		timer.schedule(new TimerTask() {
+			@Override
+			public void run() {
+				//System.out.println(new Date());
+			}
+		}, 0, 1000);//1000 -> 1sec once print if u change convent use of time
+
 
 	}
 }
