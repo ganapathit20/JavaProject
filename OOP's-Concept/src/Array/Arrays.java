@@ -8,6 +8,8 @@ public class Arrays {
 
 	public static void main(String[] args) throws Exception {
 
+		sortArray();
+		
 		int[] numbers = getInteger(5);
 
 		for(int i=0; i<numbers.length; i++) {
@@ -42,6 +44,41 @@ public class Arrays {
 
 		return (double) sum /(double) avgArray.length;
 
+	}
+	
+	
+	public static void sortArray() {
+		
+		int[] numbers = {12,98,21,10,77};
+
+		boolean flag = true;
+
+		while(flag) {
+
+			flag = false;
+
+			for(int i=0; i<numbers.length-1; i++) {
+				
+				//greatest number if(numbers[i] < numbers[i+1])
+
+				if(numbers[i] > numbers[i+1]) { // smallest number
+
+					int tem = numbers[i];
+
+					numbers[i] = numbers[i+1];
+
+					numbers[i+1]=tem;	
+
+					flag = true;
+				}
+
+			}
+
+		}
+		for(int i=0; i<numbers.length; i++) {
+
+			System.out.println(numbers[i]);
+		}
 	}
 
 }
