@@ -3,13 +3,15 @@ package Array;
 import java.util.Scanner;
 
 public class Arrays {
-	
+
 	private static Scanner sc = new Scanner(System.in);
 
 	public static void main(String[] args) throws Exception {
 
-		sortArray();
+		IndexChange.indexChange();
 		
+		sortArray();
+
 		int[] numbers = getInteger(5);
 
 		for(int i=0; i<numbers.length; i++) {
@@ -45,10 +47,10 @@ public class Arrays {
 		return (double) sum /(double) avgArray.length;
 
 	}
-	
-	
+
+
 	public static void sortArray() {
-		
+
 		int[] numbers = {12,98,21,10,77};
 
 		boolean flag = true;
@@ -58,7 +60,7 @@ public class Arrays {
 			flag = false;
 
 			for(int i=0; i<numbers.length-1; i++) {
-				
+
 				//greatest number if(numbers[i] < numbers[i+1])
 
 				if(numbers[i] > numbers[i+1]) { // smallest number
@@ -81,4 +83,31 @@ public class Arrays {
 		}
 	}
 
+}
+
+class IndexChange{
+
+	public static void indexChange() {
+
+		int[] arrayNumber = {1,2,3,4,5};
+
+		int maxIndex = arrayNumber.length-1;
+		int halfArray = arrayNumber.length/2;
+
+		System.out.println(arrayNumber.length);
+
+		for(int i= 0; i< halfArray; i++) {
+
+			int tem = arrayNumber[i];
+			arrayNumber[i] = arrayNumber[maxIndex-i];
+			arrayNumber[maxIndex-i] = tem;
+		}
+
+		for(int i= 0; i< arrayNumber.length; i++) {
+			System.out.println(arrayNumber[i]);
+		}
+
+
+
+	}
 }
