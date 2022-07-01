@@ -1,0 +1,55 @@
+sudo docker pull cassandra:latest -> pull the images
+
+sudo docker images| grep cassandra
+
+sudo docker run --name cassandra(any name) -d cassandra:3.11.5 -> run the cassandra 
+
+sudo docker ps --> check local running container 
+
+sudo docker logs -f cassandra-> verify 
+
+sudo docker exec -it cassandra bash
+
+cqlsh
+
+
+sudo docker container stop [containerName] -> stop 
+
+sudo docker container rm [containerName] -> remove  
+
+
+
+---------------------------------------
+/**MySql install**/
+
+sudo docker pull mysql/mysql-server:latest -> download mysql
+
+sudo docker images->check images 
+
+sudo docker run --name=mysql -d mysql/mysql-server:latest->create container
+
+sudo docker ps --> check local running container 
+
+sudo apt-get install mysql-client ->(Before you can connect the MySQL server container with the host, you need to make sure the MySQL client package is installed:)
+
+sudo docker logs mysql[<-any name given] -> container logs it generate random one time password then must be change that password 
+
+sudo docker exec -it mysql bash->run container
+
+mysql -u root -p
+
+pass:WELCOME123
+
+ALTER USER 'root'@'localhost' IDENTIFIED  BY 'WELCOME123'; -> password chenge
+
+------------------------------------------------
+
+docker container ls 
+
+docker container ls -a 
+
+docker container stop (container id)
+
+docker container rm (container id)
+
+docker image rm (container id)

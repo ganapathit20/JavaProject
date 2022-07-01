@@ -1,0 +1,22 @@
+/* basic step 1: */
+mkdir script
+cd script
+ls
+nano welcome.sh
+
+Basic Syntax:
+
+#! /bin/bash
+#
+echo "hello world"
+
+#
+#
+-----------
+ls -l
+chmod +x welcome.sh -> given permision for excute
+sudo ./welcome.sh -> run comment
+
+--------------------------------------------
+/* step 2: */
+

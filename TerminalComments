@@ -1,0 +1,23 @@
+cd sudo kill `sudo lsof -t -i:3306` -> use to avoid error listen tcp 0.0.0.0:3306: bind: address already in use
+
+sudo service mysql stop -> stop exiting run mysql service
+
+sudo netstat -nlp | grep :8080
+
+sudo kill -9  83496(<-PID) -> kill port
+
+rm -rf - delete dir with folder
+
+
+sudo chmod -R 755 /path/ ->  permission 
+
+
+https://download.eclipse.org/releases/2020-12/ -> eclipse updated link 
+
+
+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 -> github pass
+
+
+check local running port -> netstat -a
+
+grap particular port -> netstat -a | grep -i “listen”
