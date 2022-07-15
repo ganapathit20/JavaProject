@@ -1,0 +1,154 @@
+Elastic Search Query:
+
+basic syntax:
+
+{
+"_source":[],
+"size":10,
+"min_score":0.3,---> optional
+"query":{
+"bool":{
+"must":[], ---> and
+"filter":[],
+"should":[],---->or
+"must_not":[],----> not 
+}
+}
+} 
+
+============================
+basic match and match pharse query:
+
+match query match all relavant are:
+
+{
+"query":{
+"match"{
+"text":"ganapthi maths"
+}
+}
+}
+
+match pharse query match exact match only:
+
+{
+"query":{
+"match_pharse"{
+"text":"ganapthi maths"
+}
+}
+}
+
+=======================
+must Match look for the world nazi and camps :
+
+{
+"_source":["title"],
+"size":10,
+"min_score":0.3,---> optional
+"query":{
+"bool":{
+"must":[
+{
+"match":{"title": "nazi"}
+},
+{
+"match":{"title": "camps"}
+}
+], ---> and
+"filter":[],
+"should":[],---->or
+"must_not":[],----> not 
+}
+}
+} 
+
+OR Match look for the world nazi or camps :
+{
+"_source":["title"],
+"size":10,
+"min_score":0.3,---> optional
+"query":{
+"bool":{
+"must":[], ---> and
+"filter":[],
+"should":[
+{
+"match":{"title": "nazi"}
+},
+{
+"match":{"title": "camps"}
+}
+],---->or
+"must_not":[],----> not 
+}
+}
+} 
+
+OR and  not Match look for the world nazi or camps and not include mega world:
+
+{
+"_source":["title"],
+"size":10,
+"min_score":0.3,---> optional
+"query":{
+"bool":{
+"must":[],
+"filter":[],
+"should":[
+{
+"match":{"title": "nazi"}
+},
+{
+"match":{"title": "camps"}
+}
+],---->or
+"must_not":[
+
+{
+"match":{"title": "mega"}
+}
+
+], 
+}
+}
+} 
+
+=======================
+This nested bool in must not (Title is a or b not c or d):
+{
+"_source":["title"],
+"size":10,
+"min_score":0.3,---> optional
+"query":{
+"bool":{
+"must":[],
+"filter":[],
+"should":[
+{
+"match":{"title": "nazi"}
+},
+{
+"match":{"title": "camps"}
+}
+],---->or
+"must_not":[
+
+{
+"bool":{
+"should":{
+
+{
+"match":{"title": "mega"}
+},
+{
+"match":{"title": "ohm"}
+}
+}
+}
+}
+], 
+}
+}
+} 
+
