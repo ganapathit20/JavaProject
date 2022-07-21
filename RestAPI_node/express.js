@@ -1,3 +1,4 @@
+const { clear } = require('console')
 const express = require('express')
 
 const start = express()
