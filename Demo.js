@@ -1,3 +1,5 @@
+//**Starting js basic */
+
 var http = require('http');
 
 http.createServer(function(req, res){
@@ -7,3 +9,10 @@ http.createServer(function(req, res){
     res.end();
 }).listen(8088);
 
+//Modules create and use different aear
+
+var cal = require("./cal.js")
+
+var result = cal.addition(10,34)
+
+console.log(result)
