@@ -23,3 +23,38 @@ console.log(result)
 // mul
 var result = cal.multiplication(100,34)
 console.log(result)
+
+// File System Example
+
+var fs = require('fs');
+
+//readFile 3 args needs 1.filePath, 2. formate, 3. callback function
+//callback function needs 2 args 1. error, 2. data(give any name)
+// callback funcrion use 2ways 1. function(){}, 2. ()=>{}
+fs.readFile("cal.js", "UTF8", (error, data)=>{ 
+
+    if(error)
+        throw error
+    console.info(data)
+
+})
+
+//write files 
+// it is create new file if does not exited 
+// fs.writeFile("cal1.js", "console.info(\"new File created\")", function(error){
+//     if(error)
+//     throw error
+
+//     console.info("done...")
+
+// })
+
+
+// it is append data to the same file if there
+// fs.appendFile("cal.js", "console.info(\"hi\")", function(error){
+//     if(error)
+//     throw error
+
+//     console.info("done...")
+
+// })
