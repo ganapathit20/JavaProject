@@ -12,7 +12,14 @@ http.createServer(function(req, res){
 //Modules create and use different aear
 
 var cal = require("./cal.js")
-
+// add
 var result = cal.addition(10,34)
+console.log(result)
 
+// sub
+var result = cal.substraction(100,34)
+console.log(result)
+
+// mul
+var result = cal.multiplication(100,34)
 console.log(result)
